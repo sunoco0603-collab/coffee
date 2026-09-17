@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>コーヒー学習アプリ</title>
+<meta name="theme-color" content="#6b4423">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="コーヒー">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#9749;</text></svg>">
+<script>
+// 起動時エラーを画面に可視化（真っ白画面の防止）
+window.onerror = function(msg, srcUrl, line, col){
+  try{
+    var d = document.getElementById("boot-err");
+    if(!d){
+      d = document.createElement("div");
+      d.id = "boot-err";
+      d.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:9999;background:#fdf0ef;color:#b91c1c;padding:10px 16px;font-size:13px;font-family:sans-serif;border-bottom:1px solid #f2c7c3;white-space:pre-wrap;";
+      (document.body || document.documentElement).appendChild(d);
+    }
+    d.textContent = "アプリ内部でエラーが発生しました：" + msg + (line ? "（" + line + "行目）" : "");
+  }catch(e){}
+  return false;
+};
+</script>
+<style>
+:root{
+  --bg:#f6f3ef; --card:#ffffff; --ink:#2a2118; --muted:#7a6d5e;
+  --accent:#8b5e34; --accent-dark:#6b4423; --accent-soft:#f5ede3;
+  --ok:#15803d; --ok-bg:#ecfdf3; --ok-line:#bbe7c9;
+  --warn:#b45309; --warn-bg:#fff7e8; --warn-line:#f3ddb0;
+  --err:#b91c1c; --err-bg:#fdf0ef; --err-line:#f2c7c3;
+  --line:#e6ddd1; --code-bg:#2a2118; --code-ink:#e8e0d5;
+  --acid:#c2410c; --bitter:#4a3520;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html{font-size:15px;}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Segoe UI","Hiragino Sans","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+  line-height:1.75;
+}
+button{font-family:inherit; cursor:pointer;}
+/* ---------- header ---------- */
+header{
+  position:sticky; top:0; z-index:20;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:10px 18px; background:var(--card); border-bottom:1px solid var(--line);
+  box-shadow:0 1px 6px rgba(60,40,20,.07); flex-wrap:wrap;
+}
+.hd-left{display:flex; align-items:center; gap:10px;}
+.logo{font-size:1.7rem;}
+.app-title{font-weight:700; font-size:1.05rem; line-height:1.3;}
+.app-sub{font-size:.72rem; color:var(--muted);}
+.hd-right{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+.overall{display:flex; align-items:center; gap:8px;}
+.overall-bar{width:120px; height:8px; background:var(--line); border-radius:99px; overflow:hidden;}
+#overall-fill{height:100%; width:0%; background:linear-gradient(90deg,#a97142,#6b4423); border-radius:99px; transition:width .7s cubic-bezier(.22,1,.36,1);}
+#overall-pct{font-size:.82rem; color:var(--muted);}
+.gear{font-size:1.2rem; background:none; border:none; padding:4px;}
+/* ---------- tabs ---------- */
+.tabbar{display:flex; gap:4px; flex-wrap:wrap; max-width:1180px; margin:0 auto; padding:10px 18px 0;}
+.tab-btn{
+  padding:8px 14px; border:1px solid var(--line); border-bottom:none;
+  background:var(--card); color:var(--muted); border-radius:10px 10px 0 0;
+  font-size:.9rem; font-weight:600;
+}
+.tab-btn.active{color:var(--accent-dark); background:var(--accent-soft); border-color:var(--accent);}
+.wrap{max-width:1180px; margin:0 auto; padding:16px 18px 60px;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+/* ---------- generic card ---------- */
+.card{
+  background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:18px 20px; margin-bottom:16px; transition:box-shadow .25s ease;
+}
+.card h3{font-size:1.05rem; margin-bottom:10px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.muted{color:var(--muted); font-size:.85rem;}
+.pill{font-size:.7rem; font-weight:700; color:#fff; background:var(--accent); border-radius:6px; padding:1px 8px;}
+.pill.gray{background:#a49484;}
+.pill.dark{background:#4a3520;}
+.pill.season{background:#c2410c;}
+.pill.esp{background:#3f3f46;}
+.pill.ice{background:#0ea5e9;}
+.pill.ok{background:var(--ok);}
+.pill.order{background:#7c3aed;}
+/* ---------- buttons ---------- */
+.btn{
+  padding:7px 14px; border:1px solid var(--line); border-radius:9px;
+  background:var(--card); color:var(--ink); font-size:.88rem; font-weight:600;
+}
+.btn:hover{border-color:var(--accent);}
+.btn-primary{background:var(--accent); color:#fff; border-color:var(--accent);}
+.btn-primary:hover{background:var(--accent-dark);}
+.btn-sm{padding:4px 10px; font-size:.8rem;}
+.btn-row{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
+.btn:disabled{opacity:.5; cursor:default;}
+/* ---------- meters ---------- */
+.meter{margin:9px 0;}
+.meter-head{display:flex; justify-content:space-between; align-items:baseline; font-size:.78rem; color:var(--muted); margin-bottom:3px;}
+.meter-name{font-weight:700; color:var(--accent-dark);}
+.meter-track{
+  position:relative; height:14px; border-radius:99px; overflow:visible;
+  background:linear-gradient(90deg,#f0b27a,#a0522d);
+}
+.meter-track.roast{background:linear-gradient(90deg,#d9b382,#3b2415);}
+.meter-track.body{background:linear-gradient(90deg,#efe0cc,#8b5e34);}
+.meter-dot{
+  position:absolute; top:50%; width:13px; height:13px; border-radius:50%;
+  background:#2a2118; border:2px solid #fff; transform:translate(-50%,-50%);
+  box-shadow:0 1px 3px rgba(0,0,0,.4);
+}
+.meter-dot.guess{background:#c2410c;}
+.meter-dot.ans{background:#15803d;}
+.meter-ends{display:flex; justify-content:space-between; font-size:.7rem; color:var(--muted); margin-top:2px;}
+/* スライダー */
+.slider-row{margin:14px 0;}
+.slider-label{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;}
+.slider-label .nm{font-weight:700; font-size:.9rem; color:var(--accent-dark);}
+.slider-label .val{font-size:.85rem; color:var(--muted); font-variant-numeric:tabular-nums;}
+input[type=range]{width:100%; accent-color:var(--accent); height:26px;}
+.slider-scale{display:flex; justify-content:space-between; font-size:.72rem; color:var(--muted);}
+.judge-row{display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; font-size:.85rem;}
+.judge{padding:2px 9px; border-radius:7px; font-weight:700;}
+.judge.perfect{background:var(--ok-bg); color:var(--ok); border:1px solid var(--ok-line);}
+.judge.close{background:var(--warn-bg); color:var(--warn); border:1px solid var(--warn-line);}
+.judge.miss{background:var(--err-bg); color:var(--err); border:1px solid var(--err-line);}
+/* ---------- quiz ---------- */
+.choices{display:flex; flex-direction:column; gap:7px; margin:10px 0;}
+.choice{
+  text-align:left; padding:9px 13px; border:1px solid var(--line); border-radius:10px;
+  background:var(--card); font-size:.92rem; color:var(--ink);
+}
+.choice:hover{border-color:var(--accent);}
+.choice.correct{background:var(--ok-bg); border-color:var(--ok-line); color:var(--ok);}
+.choice.wrong{background:var(--err-bg); border-color:var(--err-line); color:var(--err);}
+.choice.disabled{pointer-events:none;}
+.feedback{margin-top:10px; padding:10px 14px; border-radius:10px; font-size:.9rem; display:none;}
+.feedback.show{display:block;}
+.feedback.ok{background:var(--ok-bg); border:1px solid var(--ok-line);}
+.feedback.ng{background:var(--err-bg); border:1px solid var(--err-line);}
+.feedback.part{background:var(--warn-bg); border:1px solid var(--warn-line);}
+.hint-box{background:var(--accent-soft); border-radius:9px; padding:8px 12px; margin-top:8px; font-size:.9rem;}
+.blank{
+  display:inline-block; min-width:5.5em; padding:0 6px; text-align:center;
+  border-bottom:2px solid var(--accent); font-weight:700; color:var(--muted);
+}
+.blank.filled{color:var(--ok); border-bottom-color:var(--ok);}
+.blank.wrongfill{color:var(--err); border-bottom-color:var(--err); text-decoration:line-through;}
+.blank.cur{background:var(--accent-soft); color:var(--accent-dark);}
+.q-desc{font-size:1rem; line-height:2.1; margin:10px 0;}
+.q-name{font-size:1.3rem; font-weight:700; color:var(--accent-dark);}
+.q-nameen{font-size:.82rem; color:var(--muted);}
+.step-head{font-size:.78rem; font-weight:700; color:#fff; background:var(--accent); border-radius:6px; padding:1px 9px; display:inline-block; margin-bottom:8px;}
+/* ---------- 図鑑 ---------- */
+.filter-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;}
+.filter-row select,.filter-row input{font-size:.85rem; padding:5px 9px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--ink);}
+.zukan-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px;}
+.p-card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:15px 17px;}
+.p-card .nm{font-size:1.05rem; font-weight:700;}
+.p-card .en{font-size:.75rem; color:var(--muted); margin-bottom:4px;}
+.p-card .ct{font-size:.85rem; font-weight:700; color:var(--accent-dark); margin:5px 0;}
+.p-card .ds{font-size:.85rem; color:var(--ink); margin-bottom:8px;}
+.p-card .og{font-size:.78rem; color:var(--muted); text-align:right;}
+.badges{display:flex; gap:5px; flex-wrap:wrap; margin-bottom:5px;}
+/* ---------- ホーム ---------- */
+.heat-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:7px;}
+.heat{
+  padding:7px 9px; border-radius:9px; font-size:.78rem; border:1px solid var(--line);
+  background:var(--card); cursor:pointer; text-align:left; line-height:1.4; color:var(--ink);
+}
+.heat.l1{background:#f5ede3;} .heat.l2{background:#e2c9a8;} .heat.l3{background:#c89f6d;}
+.heat.l4{background:#8b5e34; color:#fff; border-color:#6b4423;}
+.heat .n{font-weight:700; display:block;}
+.heat .s{font-size:.7rem; opacity:.85;}
+.stat-row{display:flex; gap:18px; flex-wrap:wrap; margin-bottom:10px;}
+.stat{text-align:center;}
+.stat .v{font-size:1.5rem; font-weight:700; color:var(--accent-dark);}
+.stat .l{font-size:.75rem; color:var(--muted);}
+/* ---------- 設定 ---------- */
+textarea.import-area{width:100%; min-height:120px; border:1px solid var(--line); border-radius:10px; padding:10px; font-family:Consolas,Menlo,monospace; font-size:.8rem;}
+.st-log{font-family:Consolas,Menlo,monospace; font-size:.8rem; white-space:pre-wrap; background:var(--code-bg); color:var(--code-ink); border-radius:10px; padding:12px 14px; max-height:280px; overflow:auto;}
+.st-ok{color:#4ade80;} .st-ng{color:#f87171;} .st-wn{color:#fbbf24;}
+.edit-row{display:grid; grid-template-columns:1fr auto auto auto; gap:8px; align-items:center; padding:7px 0; border-bottom:1px solid var(--line); font-size:.85rem;}
+.edit-row .en{color:var(--muted); font-size:.75rem;}
+.edit-row input[type=number]{width:60px; padding:4px 6px; border:1px solid var(--line); border-radius:7px; font-size:.85rem;}
+.edit-head{display:grid; grid-template-columns:1fr auto auto auto; gap:8px; font-size:.72rem; color:var(--muted); font-weight:700; padding-bottom:4px;}
+.edited{background:var(--warn-bg);}
+.empty{color:var(--muted); padding:24px; text-align:center;}
+hr.sep{border:none; border-top:1px solid var(--line); margin:18px 0;}
+.section-title{font-size:1.15rem; font-weight:700; margin:6px 0 12px;}
+.sess-bar{display:flex; justify-content:space-between; align-items:center; font-size:.85rem; color:var(--muted); margin-bottom:10px; flex-wrap:wrap; gap:8px;}
+@media (max-width:480px){
+  .edit-row,.edit-head{grid-template-columns:1fr; gap:4px;}
+  .edit-row{padding:10px 0;}
+  .heat-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));}
+}
+</style>
+</head>
+<body>
+<noscript><div style="padding:16px;background:#fdf0ef;color:#b91c1c;font-family:sans-serif;">このアプリの動作には JavaScript が必要です。</div></noscript>
+<header>
+  <div class="hd-left">
+    <span class="logo">&#9749;</span>
+    <div>
+      <div class="app-title">コーヒー学習アプリ</div>
+      <div class="app-sub">商品名 &#8596; 味わいを覚える</div>
+    </div>
+  </div>
+  <div class="hd-right">
+    <div class="overall">
+      <div class="overall-bar"><div id="overall-fill"></div></div>
+      <span id="overall-pct">0%</span>
+    </div>
+    <button class="gear" id="gear-btn" title="設定">&#9881;</button>
+  </div>
+</header>
+
+<nav class="tabbar" id="tabbar"></nav>
+
+<div class="wrap">
+  <section class="tab-panel" id="panel-home"></section>
+  <section class="tab-panel" id="panel-zukan"></section>
+  <section class="tab-panel" id="panel-forward"></section>
+  <section class="tab-panel" id="panel-reverse"></section>
+  <section class="tab-panel" id="panel-mix"></section>
+  <section class="tab-panel" id="panel-settings"></section>
+</div>
+
+<script>
+"use strict";
+// ==== 商品データ（KALDI コーヒーカタログより転記） ====
+// taste: 1(酸味)〜10(苦味) / body: 1(ライト)〜4(フル) / roast: 1(浅煎り)〜7(深煎り)
+// meterConf: "high"=ドット位置が明瞭 / "low"=写真から読み取り誤差の可能性あり（設定タブで修正可）
+var PRODUCTS = [
+/* ---------- Blend（通常ロースト）---------- */
+{
+  id:"mild-kaldi", name:"マイルドカルディ", nameEn:"Mild Kaldi",
+  category:"blend", dark:false, seasonal:false, icons:[], origin:null,
+  cat:"人気No.1! 持続する甘い余韻",
+  desc:"ブラジル本来のやさしい甘さを引き出した当店おすすめのブレンドです。柔らかな口あたりと持続する甘さをぜひお試しください。",
+  taste:5, body:2, roast:4, meterConf:"low",
+  keys:["やさしい甘さ","柔らかな口あたり","持続する甘さ"]
+},
+{
+  id:"special-blend", name:"スペシャルブレンド", nameEn:"Special Blend",
+  category:"blend", dark:false, seasonal:false, icons:[], origin:null,
+  cat:"しっかりとしたコクのバランスタイプ",
+  desc:"しっかりとした飲みごたえが持ち味で、苦味と酸味の奥行きを特徴とする深みのあるブレンド。",
+  taste:5, body:3, roast:4, meterConf:"low",
+  keys:["しっかりとした飲みごたえ","苦味と酸味の奥行き","深みのあるブレンド"]
+},
+{
+  id:"blue-mountain-blend", name:"ブルーマウンテンブレンド", nameEn:"Blue Mountain Blend",
+  category:"blend", dark:false, seasonal:false, icons:[], origin:null,
+  cat:"“ブルーマウンテン”の堂々たる品格",
+  desc:"ブルーマウンテンをブレンドした堂々たる味わい。香りと甘み、苦味と酸味が織りなすバランスは秀逸です。",
+  taste:4, body:3, roast:4, meterConf:"low",
+  keys:["堂々たる味わい","香りと甘み","バランスは秀逸"]
+},
+{
+  id:"mocha-blend", name:"モカブレンド", nameEn:"Mocha Blend",
+  category:"blend", dark:false, seasonal:false, icons:[], origin:null,
+  cat:"芳醇な香りと滑らかなコク",
+  desc:"モカの華やかな香りに、柔らかなコクをバランスよくブレンドしました。ワインのような芳醇さが特徴です。",
+  taste:3, body:3, roast:4, meterConf:"low",
+  keys:["華やかな香り","柔らかなコク","ワインのような芳醇さ"]
+},
+{
+  id:"premium-blend", name:"プレミアムブレンド", nameEn:"Premium Blend",
+  category:"blend", dark:false, seasonal:false, icons:[], origin:null,
+  cat:"上質を求めた、こだわりの逸品",
+  desc:"コロンビア・ブラジル・グアテマラ産有機栽培コーヒー生豆を贅沢に使用。3つの産地の味・香りをお楽しみください。",
+  taste:5, body:3, roast:4, meterConf:"low",
+  keys:["有機栽培コーヒー生豆","3つの産地の味・香り"]
+},
+{
+  id:"bird-friendly-blend", name:"バードフレンドリー ブレンド", nameEn:"Bird Friendly Blend",
+  category:"blend", dark:false, seasonal:false, icons:[], origin:null,
+  cat:"バードフレンドリー3種の贅沢ブレンド",
+  desc:"バードフレンドリー認証コーヒーのみでブレンドした柔らかな口あたりと甘い余韻が特徴のコーヒーです。",
+  taste:4, body:2, roast:4, meterConf:"low",
+  keys:["柔らかな口あたり","甘い余韻"]
+},
+{
+  id:"womans-hand", name:"ウーマンズハンドフェアトレードブレンド", nameEn:"Woman's Hand Fairtrade Blend",
+  category:"blend", dark:false, seasonal:false, icons:[], origin:null,
+  cat:"女性達の自立の懸け橋、やさしく繊細な味わい",
+  desc:"グアテマラの女性達の手によって育てられたウーマンズハンドコーヒーをブレンド。優しい口あたり、すっきりとした後味が特徴です。",
+  taste:4, body:2, roast:3, meterConf:"low",
+  keys:["優しい口あたり","すっきりとした後味"]
+},
+{
+  id:"american-blend", name:"アメリカンブレンド", nameEn:"American Blend",
+  category:"blend", dark:false, seasonal:false, icons:[], origin:null,
+  cat:"すっきりライトで飲みやすい",
+  desc:"たくさん飲んでも飲み飽きない、やさしい味わいのブレンド。ほんのり感じる甘みと軽い口あたりが特徴です。",
+  taste:3, body:1, roast:2, meterConf:"low",
+  keys:["飲み飽きない","ほんのり感じる甘み","軽い口あたり"]
+},
+{
+  id:"kaldis-angel", name:"KALDI'S エンジェル", nameEn:"KALDI'S Angel",
+  category:"blend", dark:false, seasonal:true, icons:["espresso"], origin:null,
+  cat:"チョコと相性ピッタリ、バレンタイン限定ブレンド",
+  desc:"チョコレートとの相性を考えて生まれたブレンド。ほんのり広がる酸味と、フワッと香る甘い印象が特徴のコーヒーです。",
+  taste:4, body:3, roast:5, meterConf:"low",
+  keys:["ほんのり広がる酸味","フワッと香る甘い印象"]
+},
+{
+  id:"halloween-blend", name:"ハロウィンブレンド", nameEn:"Halloween Blend",
+  category:"blend", dark:false, seasonal:true, icons:[], origin:null,
+  cat:"豊かな甘さがお菓子にぴったり",
+  desc:"お菓子にぴったりのハロウィン限定の中煎りブレンド。ブラウンシュガーのような豊かな甘さが特徴です。",
+  taste:5, body:3, roast:4, meterConf:"low",
+  keys:["ハロウィン限定の中煎り","ブラウンシュガーのような豊かな甘さ"]
+},
+/* ---------- Blend / Dark Roasted ---------- */
+{
+  id:"italian-ice-blend", name:"イタリアンロースト／アイスブレンド", nameEn:"Italian Roast / Ice Blend",
+  category:"blend", dark:true, seasonal:false, icons:["espresso","ice"], origin:null,
+  cat:"定番のダークブレンド ホットもアイスも◎",
+  desc:"ホットでもアイスでもしっかりとした飲みごたえを楽しめるブレンドです。濃厚な苦味とブラジル本来の甘さが楽しめます。",
+  taste:9, body:4, roast:7, meterConf:"low",
+  keys:["しっかりとした飲みごたえ","濃厚な苦味","ブラジル本来の甘さ"]
+},
+{
+  id:"rich-blend", name:"リッチブレンド", nameEn:"Rich Blend",
+  category:"blend", dark:true, seasonal:false, icons:["espresso"], origin:null,
+  cat:"重厚感のある苦味と深いコク",
+  desc:"重厚感のある強い苦味、充実感の高い深いコクが特徴のブレンド。",
+  taste:9, body:4, roast:6, meterConf:"low",
+  keys:["重厚感のある強い苦味","充実感の高い深いコク"]
+},
+{
+  id:"morning-blend", name:"モーニングブレンド", nameEn:"Morning Blend",
+  category:"blend", dark:true, seasonal:false, icons:[], origin:null,
+  cat:"目覚めの一杯にオススメのキレの良い苦味",
+  desc:"キレのある苦味とすっきりとした後味。目覚めの一杯におすすめの飲みやすいブレンド。",
+  taste:8, body:3, roast:6, meterConf:"low",
+  keys:["キレのある苦味","すっきりとした後味","飲みやすいブレンド"]
+},
+{
+  id:"espresso-blend", name:"エスプレッソブレンド", nameEn:"Espresso Blend",
+  category:"blend", dark:true, seasonal:false, icons:["espresso"], origin:null,
+  cat:"苦味とキレに秘めた芳醇なアロマ",
+  desc:"強い苦味と長く続く芳醇なアロマが特徴のブレンドです。あらゆる器具で味・香りが引き立ちます。",
+  taste:9, body:4, roast:7, meterConf:"low",
+  keys:["強い苦味","長く続く芳醇なアロマ","あらゆる器具"]
+},
+{
+  id:"guatemala-french", name:"グアテマラフレンチ", nameEn:"Guatemala French",
+  category:"blend", dark:true, seasonal:false, icons:["espresso","ice"], origin:null,
+  cat:"凝縮された果実味、個性的な味わい",
+  desc:"タイプの違うグアテマラ2種のブレンド。ストロベリーを噛むような濃厚な香りと甘みが特徴。",
+  taste:7, body:4, roast:6, meterConf:"low",
+  keys:["タイプの違うグアテマラ2種","ストロベリーを噛むような濃厚な香り"]
+},
+{
+  id:"noel", name:"ノエル", nameEn:"Noël",
+  category:"blend", dark:true, seasonal:true, icons:["espresso"], origin:null,
+  cat:"スイーツによく合うクリスマス限定商品",
+  desc:"スイーツとの相性がよく、ミルクや砂糖と合わせれば、チョコやナッツのような甘味とビターな味わいが楽しめます。",
+  taste:8, body:3, roast:6, meterConf:"low",
+  keys:["スイーツとの相性","チョコやナッツのような甘味","ビターな味わい"]
+},
+/* ---------- Straight（通常ロースト）---------- */
+{
+  id:"kilimanjaro", name:"キリマンジャロ", nameEn:"Tanzania Kilimanjaro",
+  category:"straight", dark:false, seasonal:false, icons:[], origin:"タンザニア",
+  cat:"甘酸っぱい香りとキレのある酸味",
+  desc:"アフリカ最高峰のキリマンジャロ山で有名なタンザニアのコーヒー。甘酸っぱい香りを思わせる、上質でキレの良い酸味が特徴です。",
+  taste:2, body:2, roast:3, meterConf:"low",
+  keys:["甘酸っぱい香り","キレの良い酸味"]
+},
+{
+  id:"mandheling", name:"マンデリン", nameEn:"Indonesia Mandheling",
+  category:"straight", dark:false, seasonal:false, icons:[], origin:"インドネシア（スマトラ島）",
+  cat:"野性的な香りと力強いボディ",
+  desc:"インドネシアの肥沃な土壌、スマトラ島産。野性的で力強いボディに、引き締まった酸味が深みを与えてくれます。",
+  taste:6, body:4, roast:4, meterConf:"low",
+  keys:["野性的で力強いボディ","引き締まった酸味"]
+},
+{
+  id:"guatemala", name:"グアテマラ", nameEn:"Guatemala",
+  category:"straight", dark:false, seasonal:false, icons:[], origin:"グアテマラ",
+  cat:"すっきりとした爽やかな酸味",
+  desc:"フローラルな香りと爽やかな酸味が特徴。ミルク砂糖と合わせるとキャラメルやアップルパイを思わせる甘さとコクが際立ちます。",
+  taste:3, body:2, roast:3, meterConf:"low",
+  keys:["フローラルな香り","爽やかな酸味","キャラメルやアップルパイ"]
+},
+{
+  id:"colombia", name:"コロンビア", nameEn:"Colombia",
+  category:"straight", dark:false, seasonal:false, icons:[], origin:"コロンビア",
+  cat:"しっかりとしたボディとコクのある酸味",
+  desc:"甘い香りとしっかりとしたボディとコク。マイルドコーヒーの代名詞として知られています。",
+  taste:4, body:3, roast:4, meterConf:"low",
+  keys:["甘い香り","しっかりとしたボディとコク","マイルドコーヒーの代名詞"]
+},
+{
+  id:"brazil", name:"ブラジル", nameEn:"Brazil",
+  category:"straight", dark:false, seasonal:false, icons:[], origin:"ブラジル",
+  cat:"やさしい甘さしっかりとしたコク",
+  desc:"コーヒー大国ブラジル。ソフトでバランスよく、カカオを思わせる甘い香りが特徴。",
+  taste:5, body:3, roast:4, meterConf:"low",
+  keys:["ソフトでバランスよく","カカオを思わせる甘い香り"]
+},
+{
+  id:"tucano-bourbon", name:"ツッカーノブルボン", nameEn:"Brazil Tucano Bourbon",
+  category:"straight", dark:false, seasonal:false, icons:[], origin:"ブラジル",
+  cat:"完熟ブルボン種を日陰干し、ふくよかな甘さ",
+  desc:"ブラジル産のブルボン種の充分に熟した実だけを収穫し、手間をかけて乾燥しました。深く甘いふくよかな香りが楽しめます。",
+  taste:4, body:3, roast:4, meterConf:"low",
+  keys:["充分に熟した実だけを収穫","深く甘いふくよかな香り"]
+},
+{
+  id:"canario", name:"カナリオ", nameEn:"Brazil Canario",
+  category:"straight", dark:false, seasonal:false, icons:[], origin:"ブラジル",
+  cat:"黄色い実をつける「カナリオ種」の華やかな香り",
+  desc:"レモンイエローの実をつける、大変稀少なブラジルの豆。華やかな香りと豆本来の甘さのバランスが、素晴らしい逸品です。",
+  taste:4, body:3, roast:4, meterConf:"low",
+  keys:["大変稀少","華やかな香り","豆本来の甘さのバランス"]
+},
+/* ---------- Straight / Dark Roasted ---------- */
+{
+  id:"mandheling-french", name:"マンデリンフレンチ", nameEn:"Indonesia Mandheling French",
+  category:"straight", dark:true, seasonal:false, icons:["espresso"], origin:"インドネシア（スマトラ島）",
+  cat:"力強くシャープな苦みと深いコク",
+  desc:"野性味あふれる香りと強いボディ。深煎りにすることで更に個性を引き出したコーヒー。",
+  taste:9, body:4, roast:7, meterConf:"low",
+  keys:["野性味あふれる香り","強いボディ","深煎りにすることで更に個性"]
+},
+{
+  id:"mocha-french", name:"モカフレンチ", nameEn:"Ethiopia Mocha French",
+  category:"straight", dark:true, seasonal:false, icons:["espresso"], origin:"エチオピア",
+  cat:"モカが香る、透明感のある苦味",
+  desc:"バニラやジャスミンを思わせる、驚くほど豊かで甘い香り。透明感のある苦味とともに、余韻がいつまでも続きます。",
+  taste:8, body:3, roast:6, meterConf:"low",
+  keys:["バニラやジャスミン","透明感のある苦味","余韻がいつまでも続きます"]
+},
+{
+  id:"doitung", name:"タイ ドイトンコーヒー", nameEn:"Thailand Doitung Coffee",
+  category:"straight", dark:true, seasonal:true, icons:["espresso"], origin:"タイ",
+  cat:"おいしいだけではない、大切な理由があります",
+  desc:"ローストナッツのような香ばしさと、ほんのりスパイシーなテイストが特徴です。バランスよくダークローストに仕上げました。",
+  taste:7, body:3, roast:6, meterConf:"low",
+  keys:["ローストナッツのような香ばしさ","ほんのりスパイシー","バランスよくダークロースト"]
+},
+/* ---------- お取り寄せコーヒー ---------- */
+{
+  id:"blue-mountain-no1", name:"ブルーマウンテンNo.1", nameEn:"Jamaica Blue Mountain No.1",
+  category:"order", dark:false, seasonal:false, icons:[], origin:"ジャマイカ",
+  cat:"「No.1」、全ての味わいが調和",
+  desc:"言わずと知れた「ブルマン」。その味わいをそのままにお楽しみ頂けます。絶妙なバランスが贅沢な佇まいを演出します。",
+  taste:4, body:3, roast:4, meterConf:"low",
+  keys:["絶妙なバランス","贅沢な佇まい"]
+},
+{
+  id:"hawaii-kona", name:"ハワイコナ", nameEn:"America Hawaii Kona",
+  category:"order", dark:false, seasonal:false, icons:[], origin:"アメリカ（ハワイ島）",
+  cat:"躍動的に広がる色彩豊かで鮮やかな酸味",
+  desc:"ハワイ島コナ地区産のストレートコーヒー。目覚ましいほど爽やかで甘酸っぱく、それでいて豊かなコクを併せ持ちます。",
+  taste:2, body:3, roast:3, meterConf:"low",
+  keys:["爽やかで甘酸っぱく","豊かなコク"]
+},
+{
+  id:"mocha-mattari", name:"モカマタリ", nameEn:"Yemen Mocha Mattari",
+  category:"order", dark:false, seasonal:false, icons:[], origin:"イエメン",
+  cat:"ワインのような芳醇な香り、やわらかい甘味とコク",
+  desc:"「貴婦人」にも例えられる上品で豊かな香り、赤ワインにも似た芳醇な風味とコクは、根強いファンを魅了します。",
+  taste:3, body:3, roast:4, meterConf:"low",
+  keys:["上品で豊かな香り","赤ワインにも似た芳醇な風味","根強いファン"]
+},
+{
+  id:"organic-decaf", name:"オーガニックデカフェ", nameEn:"Organic Decaf",
+  category:"order", dark:false, seasonal:false, icons:["ice"], origin:"メキシコ",
+  cat:"テイストにこだわった、デカフェの新定番!",
+  desc:"水を使用してカフェインをカットした、有機栽培のデカフェです。すっきりとしたやさしい口あたりとビターキャラメルを思わせる甘さをお楽しみください。",
+  taste:6, body:2, roast:5, meterConf:"low",
+  keys:["水を使用してカフェインをカット","やさしい口あたり","ビターキャラメルを思わせる甘さ"]
+}
+];
+// ==== ENGINE ====
+// -------- localStorage キー --------
+var LS = {
+  progress:"rikei.coffee.progress",
+  stats:"rikei.coffee.stats",
+  overrides:"rikei.coffee.overrides",
+  settings:"rikei.coffee.settings"
+};
+
+// -------- メーター定義 --------
+var METERS = [
+  {key:"taste", name:"テイストバランス", min:1, max:10, lo:"酸味", hi:"苦味", cls:""},
+  {key:"body",  name:"ボディ",           min:1, max:4,  lo:"ライト", hi:"フル", cls:"body"},
+  {key:"roast", name:"ロースト",         min:1, max:7,  lo:"浅煎り", hi:"深煎り", cls:"roast"}
+];
+function meterDef(key){ for(var i=0;i<METERS.length;i++) if(METERS[i].key===key) return METERS[i]; return null; }
+
+var CAT_LABEL = {blend:"ブレンド", straight:"ストレート", order:"お取り寄せ"};
+
+// -------- グローバル状態 --------
+var state = {
+  progress: {},   // productId -> {desc:bool, meter:bool, reverse:bool}
+  stats: {},      // productId -> {attempts, correct, lastSeen}
+  overrides: {},  // productId -> {taste,body,roast}
+  settings: {sessionLen:10}
+};
+
+function loadState(){
+  try{ var p=JSON.parse(localStorage.getItem(LS.progress)); if(p && typeof p==="object") state.progress=p; }catch(e){}
+  try{ var s=JSON.parse(localStorage.getItem(LS.stats)); if(s && typeof s==="object") state.stats=s; }catch(e){}
+  try{ var o=JSON.parse(localStorage.getItem(LS.overrides)); if(o && typeof o==="object") state.overrides=o; }catch(e){}
+  try{ var t=JSON.parse(localStorage.getItem(LS.settings)); if(t && typeof t==="object") state.settings=Object.assign(state.settings,t); }catch(e){}
+  if(!state.settings.sessionLen) state.settings.sessionLen=10;
+}
+function saveProgress(){ try{ localStorage.setItem(LS.progress, JSON.stringify(state.progress)); }catch(e){} }
+function saveStats(){ try{ localStorage.setItem(LS.stats, JSON.stringify(state.stats)); }catch(e){} }
+function saveOverrides(){ try{ localStorage.setItem(LS.overrides, JSON.stringify(state.overrides)); }catch(e){} }
+function saveSettings(){ try{ localStorage.setItem(LS.settings, JSON.stringify(state.settings)); }catch(e){} }
+
+// -------- 汎用 --------
+function escapeHtml(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+function $(sel, root){ return (root||document).querySelector(sel); }
+function $all(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
+function el(tag, cls, html){ var e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
+function shuffle(arr){
+  var a=arr.slice();
+  for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+function pickN(pool, n){
+  var uniq=[], seen={};
+  pool.forEach(function(x){ if(!seen[x]){ seen[x]=1; uniq.push(x); } });
+  return shuffle(uniq).slice(0, n);
+}
+function sample(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+// -------- 商品アクセス（override 適用） --------
+// メーター値は必ずこの関数経由で読む（設定タブでの修正を出題・図鑑の双方へ反映するため）
+function meterOf(p, key){
+  var ov = state.overrides[p.id];
+  if(ov && typeof ov[key]==="number") return ov[key];
+  return p[key];
+}
+function getProduct(id){ for(var i=0;i<PRODUCTS.length;i++) if(PRODUCTS[i].id===id) return PRODUCTS[i]; return null; }
+function profileOf(p){ return meterOf(p,"taste")+"-"+meterOf(p,"body")+"-"+meterOf(p,"roast"); }
+// 同じ味わいプロフィール（3メーター完全一致）の商品を返す（自分を含む）
+function matchingProducts(p){
+  var key=profileOf(p);
+  return PRODUCTS.filter(function(q){ return profileOf(q)===key; });
+}
+// メーター距離（逆引きのダミー選定に使う。段階数が違うので幅で正規化）
+function meterDistance(a, b){
+  var d=0;
+  METERS.forEach(function(m){
+    var span=m.max-m.min;
+    d += Math.abs(meterOf(a,m.key)-meterOf(b,m.key))/span;
+  });
+  return d;
+}
+
+// -------- 進捗 --------
+function progOf(id){
+  var g=state.progress[id];
+  if(!g) return {desc:false, meter:false, reverse:false};
+  return {desc:!!g.desc, meter:!!g.meter, reverse:!!g.reverse};
+}
+function markProg(id, kind){
+  var g=state.progress[id] || {};
+  g[kind]=true; state.progress[id]=g; saveProgress();
+}
+function progCount(id){ var g=progOf(id); return (g.desc?1:0)+(g.meter?1:0)+(g.reverse?1:0); }
+function overallProgress(){
+  if(!PRODUCTS.length) return 0;
+  var sum=0;
+  PRODUCTS.forEach(function(p){ sum+=progCount(p.id); });
+  return sum/(PRODUCTS.length*3);
+}
+function updateOverall(){
+  var p=Math.round(overallProgress()*100);
+  var f=$("#overall-fill"); if(f) f.style.width=p+"%";
+  var t=$("#overall-pct"); if(t) t.textContent=p+"%";
+}
+function updateStat(id, correct){
+  var st=state.stats[id]||{attempts:0,correct:0,lastSeen:0};
+  st.attempts++; if(correct) st.correct++; st.lastSeen=Date.now();
+  state.stats[id]=st; saveStats();
+}
+// 弱点順：未着手→正答率低い→古い の優先で並べる
+function weakOrder(){
+  return PRODUCTS.slice().sort(function(a,b){
+    var sa=state.stats[a.id], sb=state.stats[b.id];
+    var ra=sa&&sa.attempts? sa.correct/sa.attempts : -1;
+    var rb=sb&&sb.attempts? sb.correct/sb.attempts : -1;
+    if(ra!==rb) return ra-rb;
+    var ta=sa?sa.lastSeen:0, tb=sb?sb.lastSeen:0;
+    return ta-tb;
+  });
+}
+
+// ==================== メーター表示 ====================
+// 値 v を 0〜100% の左位置に変換（両端が中心に来るよう内側にマージンを取る）
+function meterPct(m, v){
+  var span=m.max-m.min;
+  var t=(v-m.min)/span;            // 0..1
+  return (6 + t*88);               // 6%..94%
+}
+function meterBarHtml(m, opts){
+  opts=opts||{};
+  var h='<div class="meter"><div class="meter-head"><span class="meter-name">'+escapeHtml(m.name)+'</span>';
+  h+='<span>'+(opts.showVal? escapeHtml(opts.showVal) : "")+'</span></div>';
+  h+='<div class="meter-track '+m.cls+'">';
+  if(typeof opts.guess==="number") h+='<div class="meter-dot guess" style="left:'+meterPct(m,opts.guess)+'%"></div>';
+  if(typeof opts.value==="number") h+='<div class="meter-dot'+(opts.answerColor?" ans":"")+'" style="left:'+meterPct(m,opts.value)+'%"></div>';
+  h+='</div><div class="meter-ends"><span>'+escapeHtml(m.lo)+'</span><span>'+escapeHtml(m.hi)+'</span></div></div>';
+  return h;
+}
+function metersHtml(p){
+  var h="";
+  METERS.forEach(function(m){
+    h+=meterBarHtml(m, {value:meterOf(p,m.key), showVal:meterOf(p,m.key)+" / "+m.max});
+  });
+  return h;
+}
+// 判定：0=完全一致、1=惜しい、2以上=不正解
+function judgeMeter(guess, answer){
+  var d=Math.abs(guess-answer);
+  if(d===0) return "perfect";
+  if(d===1) return "close";
+  return "miss";
+}
+function judgeScore(j){ return j==="perfect"?1 : (j==="close"?0.5 : 0); }
+var JUDGE_LABEL = {perfect:"&#9711; 正解", close:"&#9651; 惜しい", miss:"&#10005; 不正解"};
+
+// ==================== バッジ ====================
+function badgesHtml(p){
+  var h='<div class="badges">';
+  h+='<span class="pill'+(p.category==="order"?" order":(p.category==="straight"?" gray":""))+'">'+escapeHtml(CAT_LABEL[p.category]||p.category)+'</span>';
+  if(p.dark) h+='<span class="pill dark">ダークロースト</span>';
+  if(p.seasonal) h+='<span class="pill season">季節限定</span>';
+  if(p.icons.indexOf("espresso")>=0) h+='<span class="pill esp">Espresso</span>';
+  if(p.icons.indexOf("ice")>=0) h+='<span class="pill ice">Ice</span>';
+  h+='</div>';
+  return h;
+}
+
+// ==================== 穴埋め選択肢 ====================
+// 正解キーワード1つ＋他商品のキーワードからダミー3つ。重複は pickN が除去する
+function buildKeyChoices(product, correctKey){
+  var pool=[];
+  PRODUCTS.forEach(function(p){
+    if(p.id===product.id) return;
+    p.keys.forEach(function(k){ if(k!==correctKey) pool.push(k); });
+  });
+  var dummies=pickN(pool, 3);
+  return shuffle([correctKey].concat(dummies));
+}
+
+// ==================== 逆引き選択肢 ====================
+// 該当商品（同一プロフィール）をちょうど1つだけ含め、残りはメーターが近い非該当から選ぶ
+function buildReverseChoices(product){
+  var matches=matchingProducts(product);
+  var matchIds={};
+  matches.forEach(function(m){ matchIds[m.id]=1; });
+  var others=PRODUCTS.filter(function(p){ return !matchIds[p.id]; });
+  others.sort(function(a,b){ return meterDistance(product,a)-meterDistance(product,b); });
+  // 近いものから6件を候補にし、その中から3つ引く（毎回同じ顔ぶれにならないように）
+  var dummies=shuffle(others.slice(0, Math.min(6, others.length))).slice(0,3);
+  return shuffle([product].concat(dummies));
+}
+// ==================== タブ ====================
+var TABS=[
+  {id:"home",label:"ホーム"},{id:"zukan",label:"図鑑"},
+  {id:"forward",label:"&#9312; 順引き"},{id:"reverse",label:"&#9313; 逆引き"},
+  {id:"mix",label:"総合"},{id:"settings",label:"設定"}
+];
+var activeTab="home";
+function buildTabbar(){
+  var bar=$("#tabbar"); bar.innerHTML="";
+  TABS.forEach(function(t){
+    var b=el("button","tab-btn"+(t.id===activeTab?" active":""),t.label);
+    b.dataset.tab=t.id;
+    b.addEventListener("click", function(){ switchTab(t.id); });
+    bar.appendChild(b);
+  });
+}
+function switchTab(id){
+  activeTab=id;
+  $all(".tab-btn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab===id); });
+  $all(".tab-panel").forEach(function(p){ p.classList.toggle("active", p.id==="panel-"+id); });
+  renderTab(id);
+}
+function renderTab(id){
+  switch(id){
+    case "home": renderHome(); break;
+    case "zukan": renderZukan(); break;
+    case "forward": renderForward(); break;
+    case "reverse": renderReverse(); break;
+    case "mix": renderMix(); break;
+    case "settings": renderSettings(); break;
+  }
+  updateOverall();
+}
+
+// ==================== ① 順引き（商品名 → 味） ====================
+// 1問 = ステップ1（説明文の穴埋め）→ ステップ2（3メーターをスライダーで再現）
+// host に描画し、done(結果) で呼び出し元へ返す（総合タブから再利用するため）
+function buildForwardQuestion(product, host, done){
+  host.innerHTML="";
+  var card=el("div","card");
+  card.innerHTML='<div class="step-head">&#9312; 順引き ステップ1／2</div>'+
+    badgesHtml(product)+
+    '<div class="q-name">'+escapeHtml(product.name)+'</div>'+
+    '<div class="q-nameen">'+escapeHtml(product.nameEn)+'</div>'+
+    '<div class="muted" style="margin-top:8px;">説明文の空欄に入るキーワードを選んでください。</div>'+
+    '<div class="q-desc" id="fw-desc"></div>'+
+    '<div id="fw-choices"></div>'+
+    '<div class="feedback" id="fw-fb"></div>'+
+    '<div class="btn-row" id="fw-next-row" style="display:none;"><button class="btn btn-primary" id="fw-to-meter">メーターの問題へ &#8594;</button></div>';
+  host.appendChild(card);
+
+  // 説明文を「キーワード」と「地の文」に分解する。
+  // keys は selfTest D4 で desc に含まれることを保証済みだが、
+  // 念のため見つからないものはスキップして穴なしで壊れないようにする
+  var segs=[], rest=product.desc, blanks=[];
+  product.keys.forEach(function(k){
+    var idx=rest.indexOf(k);
+    if(idx<0) return;
+    blanks.push(k);
+  });
+  function renderDesc(){
+    var h="", rem=product.desc, bi=0;
+    blanks.forEach(function(k, i){
+      var idx=rem.indexOf(k);
+      if(idx<0) return;
+      h+=escapeHtml(rem.slice(0,idx));
+      var st=blankState[i];
+      var cls="blank"+(st==="ok"?" filled":(st==="ng"?" wrongfill":(i===curBlank?" cur":"")));
+      var txt=(st==="ok"||st==="ng")? blankShown[i] : "＿＿＿＿";
+      h+='<span class="'+cls+'">'+escapeHtml(txt)+'</span>';
+      rem=rem.slice(idx+k.length);
+    });
+    h+=escapeHtml(rem);
+    $("#fw-desc",card).innerHTML=h;
+  }
+  var blankState=blanks.map(function(){ return ""; });
+  var blankShown=blanks.map(function(){ return ""; });
+  var curBlank=0, correctCount=0;
+
+  function askBlank(){
+    renderDesc();
+    if(curBlank>=blanks.length){ finishStep1(); return; }
+    var key=blanks[curBlank];
+    var choices=buildKeyChoices(product, key);
+    var ch=$("#fw-choices",card);
+    ch.innerHTML='<div class="muted">空欄 '+(curBlank+1)+' / '+blanks.length+'</div><div class="choices">'+
+      choices.map(function(c,i){ return '<button class="choice" data-i="'+i+'">'+escapeHtml(c)+'</button>'; }).join("")+'</div>';
+    $all(".choice",ch).forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var picked=choices[+btn.dataset.i];
+        var ok=(picked===key);
+        blankShown[curBlank]=ok? key : picked;
+        blankState[curBlank]=ok? "ok":"ng";
+        if(ok) correctCount++;
+        $all(".choice",ch).forEach(function(b2,j){
+          b2.classList.add("disabled");
+          if(choices[j]===key) b2.classList.add("correct");
+        });
+        if(!ok) btn.classList.add("wrong");
+        curBlank++;
+        setTimeout(askBlank, ok? 450 : 1100);
+      });
+    });
+  }
+  function finishStep1(){
+    $("#fw-choices",card).innerHTML="";
+    var allOk=(correctCount===blanks.length);
+    var fb=$("#fw-fb",card);
+    fb.className="feedback show "+(allOk?"ok":(correctCount>0?"part":"ng"));
+    fb.innerHTML="<b>説明文："+correctCount+" / "+blanks.length+" 正解</b>"+
+      (allOk? "" : "<br>赤い取り消し線が誤答です。正しい語を確認してください。");
+    if(allOk) markProg(product.id,"desc");
+    updateStat(product.id, allOk);
+    $("#fw-next-row",card).style.display="";
+    $("#fw-to-meter",card).addEventListener("click", function(){
+      buildMeterStep(product, host, correctCount, blanks.length, done);
+    });
+  }
+  askBlank();
+}
+
+// ステップ2：スライダーで3メーターを再現
+function buildMeterStep(product, host, descOk, descTotal, done){
+  host.innerHTML="";
+  var card=el("div","card");
+  var h='<div class="step-head">&#9312; 順引き ステップ2／2</div>'+
+    '<div class="q-name">'+escapeHtml(product.name)+'</div>'+
+    '<div class="muted" style="margin-top:6px;">この商品のテイストバランス・ボディ・ローストをスライダーで合わせてください。</div>';
+  METERS.forEach(function(m){
+    var mid=Math.round((m.min+m.max)/2);
+    h+='<div class="slider-row" data-key="'+m.key+'">'+
+       '<div class="slider-label"><span class="nm">'+escapeHtml(m.name)+'</span>'+
+       '<span class="val"><b class="cur">'+mid+'</b> / '+m.max+'</span></div>'+
+       '<input type="range" min="'+m.min+'" max="'+m.max+'" step="1" value="'+mid+'" data-key="'+m.key+'">'+
+       '<div class="slider-scale"><span>'+escapeHtml(m.lo)+'</span><span>'+escapeHtml(m.hi)+'</span></div>'+
+       '<div class="judge-row" data-judge="'+m.key+'"></div>'+
+       '</div>';
+  });
+  h+='<div class="btn-row"><button class="btn btn-primary" id="mt-check">この値で回答する</button></div>'+
+     '<div class="feedback" id="mt-fb"></div>'+
+     '<div class="btn-row" id="mt-next-row" style="display:none;"><button class="btn btn-primary" id="mt-next">次へ &#8594;</button></div>';
+  card.innerHTML=h;
+  host.appendChild(card);
+
+  $all("input[type=range]",card).forEach(function(r){
+    r.addEventListener("input", function(){
+      $(".cur", r.closest(".slider-row")).textContent=r.value;
+    });
+  });
+
+  var answered=false;
+  $("#mt-check",card).addEventListener("click", function(){
+    if(answered) return; answered=true;
+    var score=0, detail="";
+    METERS.forEach(function(m){
+      var row=$('.slider-row[data-key="'+m.key+'"]',card);
+      var guess=+$("input[type=range]",row).value;
+      var ans=meterOf(product,m.key);
+      $(".cur",row).textContent=guess;   // 回答時点の値でラベルを確定させる
+      var j=judgeMeter(guess, ans);
+      score+=judgeScore(j);
+      $("input[type=range]",row).disabled=true;
+      // スライダーの下に「自分の回答＝橙／正解＝緑」を重ねた帯を出してズレを見せる
+      var bar=el("div",null, meterBarHtml(m,{guess:guess, value:ans, answerColor:true,
+        showVal:"あなた "+guess+" ／ 正解 "+ans}));
+      row.appendChild(bar);
+      $('[data-judge="'+m.key+'"]',card).innerHTML='<span class="judge '+j+'">'+JUDGE_LABEL[j]+'</span>';
+      detail+=m.name+"："+guess+"→"+ans+"　";
+    });
+    var pass=(score>=2);
+    if(pass) markProg(product.id,"meter");
+    updateStat(product.id, pass);
+    var fb=$("#mt-fb",card);
+    fb.className="feedback show "+(score>=2.5?"ok":(pass?"part":"ng"));
+    fb.innerHTML="<b>メーター得点："+score.toFixed(1)+" / 3.0</b>"+
+      (pass? "　この商品のメーターは習得とみなします。" : "　2.0 以上で習得です。もう一度挑戦しましょう。")+
+      '<div class="muted" style="margin-top:6px;">'+escapeHtml(product.cat)+"</div>";
+    $("#mt-check",card).disabled=true;
+    $("#mt-next-row",card).style.display="";
+    $("#mt-next",card).addEventListener("click", function(){
+      if(done) done({descOk:descOk, descTotal:descTotal, meterScore:score, pass:pass});
+    });
+    updateOverall();
+  });
+}
+
+var fwCurrent=null;
+function renderForward(){
+  var p=$("#panel-forward");
+  p.innerHTML='<div class="section-title">&#9312; 順引き：商品名 &#8594; 味わい</div>'+
+    '<div class="sess-bar"><span>商品名から、説明文のキーワードと3メーターを思い出します。</span>'+
+    '<span><button class="btn btn-sm" id="fw-weak">弱点から出題</button> '+
+    '<button class="btn btn-sm btn-primary" id="fw-rand">次の商品（ランダム）</button></span></div>'+
+    '<div id="fw-host"></div>';
+  $("#fw-rand",p).addEventListener("click", function(){ fwCurrent=sample(PRODUCTS); buildForwardQuestion(fwCurrent, $("#fw-host",p), function(){ renderForward(); }); });
+  $("#fw-weak",p).addEventListener("click", function(){ fwCurrent=weakOrder()[0]; buildForwardQuestion(fwCurrent, $("#fw-host",p), function(){ renderForward(); }); });
+  if(!fwCurrent) fwCurrent=sample(PRODUCTS);
+  buildForwardQuestion(fwCurrent, $("#fw-host",p), function(){ fwCurrent=sample(PRODUCTS); renderForward(); });
+}
+
+// ==================== ② 逆引き（味 → 商品名） ====================
+function buildReverseQuestion(product, host, done){
+  host.innerHTML="";
+  var card=el("div","card");
+  var choices=buildReverseChoices(product);
+  var h='<div class="step-head">&#9313; 逆引き</div>'+
+    '<div class="muted">次の味わいプロフィールに合う商品はどれでしょう。</div>';
+  METERS.forEach(function(m){
+    h+=meterBarHtml(m,{value:meterOf(product,m.key), showVal:meterOf(product,m.key)+" / "+m.max});
+  });
+  h+='<div class="q-desc" style="font-weight:700;color:var(--accent-dark);margin-top:10px;">'+escapeHtml(product.cat)+'</div>';
+  h+='<div class="choices">'+choices.map(function(c,i){
+       return '<button class="choice" data-i="'+i+'">'+escapeHtml(c.name)+'<span class="muted"> '+escapeHtml(c.nameEn)+'</span></button>';
+     }).join("")+'</div>';
+  h+='<div class="btn-row"><button class="btn btn-sm" id="rv-hint">ヒント</button></div><div id="rv-hints"></div>';
+  h+='<div class="feedback" id="rv-fb"></div>'+
+     '<div class="btn-row" id="rv-next-row" style="display:none;"><button class="btn btn-primary" id="rv-next">次へ &#8594;</button></div>';
+  card.innerHTML=h;
+  host.appendChild(card);
+
+  var hints=[
+    "カテゴリ："+(CAT_LABEL[product.category]||product.category)+(product.dark?"（ダークロースト）":""),
+    product.origin? ("生豆生産国："+product.origin) : "ブレンド商品です（単一産地ではありません）"
+  ];
+  var hi=0;
+  $("#rv-hint",card).addEventListener("click", function(){
+    if(hi<hints.length){ $("#rv-hints",card).appendChild(el("div","hint-box","ヒント"+(hi+1)+"： "+escapeHtml(hints[hi]))); hi++; }
+    if(hi>=hints.length) this.disabled=true;
+  });
+
+  var matches=matchingProducts(product);
+  var answered=false;
+  $all(".choice",card).forEach(function(btn){
+    btn.addEventListener("click", function(){
+      if(answered) return; answered=true;
+      var picked=choices[+btn.dataset.i];
+      // 「1つ選べば正解」：同一プロフィールの商品ならどれでも正解扱い
+      var ok = matches.some(function(m){ return m.id===picked.id; });
+      $all(".choice",card).forEach(function(b2,j){
+        b2.classList.add("disabled");
+        if(matches.some(function(m){ return m.id===choices[j].id; })) b2.classList.add("correct");
+      });
+      if(!ok) btn.classList.add("wrong");
+      if(ok) markProg(product.id,"reverse");
+      updateStat(product.id, ok);
+      var others=matches.filter(function(m){ return m.id!==picked.id; });
+      var fb=$("#rv-fb",card);
+      fb.className="feedback show "+(ok?"ok":"ng");
+      var body=(ok? "<b>正解</b> ":"<b>不正解</b> 正解は <b>"+escapeHtml(product.name)+"</b> ")+
+        '<div style="margin-top:6px;">'+escapeHtml(product.desc)+'</div>';
+      if(others.length){
+        body+='<div class="muted" style="margin-top:6px;">同じ味わいプロフィールの商品：'+
+              others.map(function(m){ return escapeHtml(m.name); }).join("、")+'</div>';
+      }
+      fb.innerHTML=body;
+      $("#rv-next-row",card).style.display="";
+      $("#rv-next",card).addEventListener("click", function(){ if(done) done({correct:ok}); });
+      updateOverall();
+    });
+  });
+}
+
+var rvCurrent=null;
+function renderReverse(){
+  var p=$("#panel-reverse");
+  p.innerHTML='<div class="section-title">&#9313; 逆引き：味わい &#8594; 商品名</div>'+
+    '<div class="sess-bar"><span>メーターと惹句から商品名を当てます。同じプロフィールの商品はどれを選んでも正解です。</span>'+
+    '<span><button class="btn btn-sm" id="rv-weak">弱点から出題</button> '+
+    '<button class="btn btn-sm btn-primary" id="rv-rand">次の問題（ランダム）</button></span></div>'+
+    '<div id="rv-host"></div>';
+  $("#rv-rand",p).addEventListener("click", function(){ rvCurrent=sample(PRODUCTS); buildReverseQuestion(rvCurrent, $("#rv-host",p), function(){ rvCurrent=sample(PRODUCTS); renderReverse(); }); });
+  $("#rv-weak",p).addEventListener("click", function(){ rvCurrent=weakOrder()[0]; buildReverseQuestion(rvCurrent, $("#rv-host",p), function(){ rvCurrent=sample(PRODUCTS); renderReverse(); }); });
+  if(!rvCurrent) rvCurrent=sample(PRODUCTS);
+  buildReverseQuestion(rvCurrent, $("#rv-host",p), function(){ rvCurrent=sample(PRODUCTS); renderReverse(); });
+}
+
+// ==================== 総合（①②をシャッフル） ====================
+var mixSession=null;
+function startMixSession(pool){
+  var n=state.settings.sessionLen;
+  var items=[];
+  var src=pool && pool.length? pool : PRODUCTS;
+  shuffle(src).slice(0,n).forEach(function(p){
+    items.push({product:p, kind: Math.random()<0.5? "forward":"reverse"});
+  });
+  mixSession={items:items, idx:0, correct:0, retry:[]};
+  renderMix();
+}
+function renderMix(){
+  var p=$("#panel-mix");
+  if(!mixSession){
+    p.innerHTML='<div class="section-title">総合セッション</div>'+
+      '<div class="card"><p class="muted">順引きと逆引きをシャッフルして '+state.settings.sessionLen+' 問出題します。間違えた商品は最後にもう一度出ます。</p>'+
+      '<div class="btn-row"><button class="btn btn-primary" id="mx-start">開始（全商品から）</button>'+
+      '<button class="btn" id="mx-weak">開始（弱点優先）</button></div></div>';
+    $("#mx-start",p).addEventListener("click", function(){ startMixSession(PRODUCTS); });
+    $("#mx-weak",p).addEventListener("click", function(){ startMixSession(weakOrder().slice(0, Math.max(state.settings.sessionLen*2,10))); });
+    return;
+  }
+  if(mixSession.idx>=mixSession.items.length){
+    // 誤答分を1巡だけ追加する
+    if(mixSession.retry.length){
+      var again=mixSession.retry.slice();
+      mixSession.retry=[];
+      mixSession.items=mixSession.items.concat(again);
+      renderMix(); return;
+    }
+    var total=mixSession.items.length;
+    var pct=total? Math.round(mixSession.correct/total*100):0;
+    p.innerHTML='<div class="section-title">総合セッション：終了</div>'+
+      '<div class="card"><div class="stat-row"><div class="stat"><div class="v">'+mixSession.correct+' / '+total+'</div><div class="l">正解数</div></div>'+
+      '<div class="stat"><div class="v">'+pct+'%</div><div class="l">正答率</div></div></div>'+
+      '<div class="btn-row"><button class="btn btn-primary" id="mx-again">もう一度</button></div></div>';
+    $("#mx-again",p).addEventListener("click", function(){ mixSession=null; renderMix(); });
+    return;
+  }
+  var cur=mixSession.items[mixSession.idx];
+  p.innerHTML='<div class="section-title">総合セッション</div>'+
+    '<div class="sess-bar"><span>'+(mixSession.idx+1)+' / '+mixSession.items.length+' 問目</span>'+
+    '<span><button class="btn btn-sm" id="mx-quit">中断</button></span></div><div id="mx-host"></div>';
+  $("#mx-quit",p).addEventListener("click", function(){ mixSession=null; renderMix(); });
+  var host=$("#mx-host",p);
+  function next(res){
+    var ok = (cur.kind==="forward")? !!(res && res.pass) : !!(res && res.correct);
+    if(ok) mixSession.correct++;
+    else mixSession.retry.push({product:cur.product, kind:cur.kind});
+    mixSession.idx++;
+    renderMix();
+  }
+  if(cur.kind==="forward") buildForwardQuestion(cur.product, host, next);
+  else buildReverseQuestion(cur.product, host, next);
+}
+
+// ==================== 図鑑 ====================
+var zkFilter={cat:"all", dark:"all", q:""};
+function renderZukan(){
+  var p=$("#panel-zukan");
+  var list=PRODUCTS.filter(function(x){
+    if(zkFilter.cat!=="all" && x.category!==zkFilter.cat) return false;
+    if(zkFilter.dark==="dark" && !x.dark) return false;
+    if(zkFilter.dark==="normal" && x.dark) return false;
+    if(zkFilter.q){
+      var q=zkFilter.q.toLowerCase();
+      var hay=(x.name+" "+x.nameEn+" "+x.desc+" "+x.cat+" "+(x.origin||"")).toLowerCase();
+      if(hay.indexOf(q)<0) return false;
+    }
+    return true;
+  });
+  var h='<div class="section-title">図鑑（'+list.length+' / '+PRODUCTS.length+' 件）</div>'+
+    '<div class="filter-row">'+
+    '<select id="zk-cat"><option value="all">全カテゴリ</option><option value="blend">ブレンド</option><option value="straight">ストレート</option><option value="order">お取り寄せ</option></select>'+
+    '<select id="zk-dark"><option value="all">焙煎すべて</option><option value="normal">通常ロースト</option><option value="dark">ダークロースト</option></select>'+
+    '<input id="zk-q" type="search" placeholder="商品名・産地・味で検索" value="'+escapeHtml(zkFilter.q)+'">'+
+    '</div><div class="zukan-grid">';
+  if(!list.length) h+='<div class="empty">該当する商品がありません。</div>';
+  list.forEach(function(x){
+    var g=progOf(x.id);
+    h+='<div class="p-card">'+badgesHtml(x)+
+      '<div class="nm">'+escapeHtml(x.name)+'</div>'+
+      '<div class="en">'+escapeHtml(x.nameEn)+'</div>'+
+      '<div class="ct">'+escapeHtml(x.cat)+'</div>'+
+      '<div class="ds">'+escapeHtml(x.desc)+'</div>'+
+      metersHtml(x)+
+      (x.origin? '<div class="og">生豆生産国：'+escapeHtml(x.origin)+'</div>' : '<div class="og">ブレンド</div>')+
+      '<div class="muted" style="margin-top:6px;">習得：'+
+        (g.desc?'<span class="pill ok">説明</span> ':'<span class="pill gray">説明</span> ')+
+        (g.meter?'<span class="pill ok">メーター</span> ':'<span class="pill gray">メーター</span> ')+
+        (g.reverse?'<span class="pill ok">逆引き</span>':'<span class="pill gray">逆引き</span>')+
+      '</div></div>';
+  });
+  h+='</div>';
+  p.innerHTML=h;
+  $("#zk-cat",p).value=zkFilter.cat;
+  $("#zk-dark",p).value=zkFilter.dark;
+  $("#zk-cat",p).addEventListener("change", function(){ zkFilter.cat=this.value; renderZukan(); });
+  $("#zk-dark",p).addEventListener("change", function(){ zkFilter.dark=this.value; renderZukan(); });
+  var qi=$("#zk-q",p);
+  qi.addEventListener("input", function(){
+    zkFilter.q=this.value; renderZukan();
+    var n=$("#zk-q"); if(n){ n.focus(); n.setSelectionRange(n.value.length,n.value.length); }
+  });
+}
+
+// ==================== ホーム ====================
+function renderHome(){
+  var p=$("#panel-home");
+  var done=0, started=0;
+  PRODUCTS.forEach(function(x){ var c=progCount(x.id); if(c===3) done++; if(c>0) started++; });
+  var h='<div class="section-title">ホーム</div>'+
+    '<div class="card"><div class="stat-row">'+
+    '<div class="stat"><div class="v">'+PRODUCTS.length+'</div><div class="l">収録商品</div></div>'+
+    '<div class="stat"><div class="v">'+done+'</div><div class="l">3項目すべて習得</div></div>'+
+    '<div class="stat"><div class="v">'+started+'</div><div class="l">着手済み</div></div>'+
+    '<div class="stat"><div class="v">'+Math.round(overallProgress()*100)+'%</div><div class="l">全体進捗</div></div>'+
+    '</div><div class="btn-row">'+
+    '<button class="btn btn-primary" id="hm-weak">今日の弱点5問</button>'+
+    '<button class="btn" id="hm-zukan">まず図鑑で読む</button></div></div>';
+  h+='<div class="card"><h3>習熟度マップ</h3><p class="muted">各商品の「説明・メーター・逆引き」3項目の達成数。クリックでその商品を順引き出題します。</p><div class="heat-grid">';
+  PRODUCTS.forEach(function(x){
+    var c=progCount(x.id);
+    h+='<button class="heat l'+(c+1)+'" data-id="'+x.id+'"><span class="n">'+escapeHtml(x.name)+'</span><span class="s">'+c+' / 3</span></button>';
+  });
+  h+='</div></div>';
+  p.innerHTML=h;
+  $("#hm-zukan",p).addEventListener("click", function(){ switchTab("zukan"); });
+  $("#hm-weak",p).addEventListener("click", function(){
+    state.settings.sessionLen=5; saveSettings();
+    startMixSession(weakOrder().slice(0,10));
+    switchTab("mix");
+  });
+  $all(".heat",p).forEach(function(b){
+    b.addEventListener("click", function(){
+      fwCurrent=getProduct(b.dataset.id);
+      switchTab("forward");
+    });
+  });
+}
+
+// ==================== 設定 ====================
+function renderSettings(){
+  var p=$("#panel-settings");
+  var h='<div class="section-title">設定</div>';
+  h+='<div class="card"><h3>総合セッションの問題数</h3><div class="btn-row">'+
+     [5,10,20].map(function(n){ return '<button class="btn'+(state.settings.sessionLen===n?" btn-primary":"")+'" data-len="'+n+'">'+n+' 問</button>'; }).join("")+
+     '</div></div>';
+  // メーター値の編集：写真からの読み取り誤差を実物カタログで直せるようにする
+  h+='<div class="card"><h3>メーター値の修正</h3>'+
+     '<p class="muted">値はカタログ写真から読み取ったものです。実物と違う場合はここで直してください（出題・図鑑の両方に即反映されます）。橙色の行は修正済みです。</p>'+
+     '<div class="edit-head"><span>商品</span><span>テイスト(1-10)</span><span>ボディ(1-4)</span><span>ロースト(1-7)</span></div>';
+  PRODUCTS.forEach(function(x){
+    var ov=state.overrides[x.id];
+    h+='<div class="edit-row'+(ov?" edited":"")+'" data-id="'+x.id+'">'+
+       '<span>'+escapeHtml(x.name)+'<br><span class="en">'+escapeHtml(x.nameEn)+'</span></span>'+
+       METERS.map(function(m){
+         return '<input type="number" min="'+m.min+'" max="'+m.max+'" value="'+meterOf(x,m.key)+'" data-key="'+m.key+'" aria-label="'+escapeHtml(x.name+" "+m.name)+'">';
+       }).join("")+
+       '</div>';
+  });
+  h+='<div class="btn-row"><button class="btn" id="st-reset-ov">修正をすべて取り消す</button></div></div>';
+  h+='<div class="card"><h3>データの書き出し・読み込み</h3>'+
+     '<p class="muted">修正したメーター値を JSON で書き出せます。次版のアプリに反映する際に使ってください。</p>'+
+     '<div class="btn-row"><button class="btn" id="st-export">修正値を書き出す</button>'+
+     '<button class="btn" id="st-import">貼り付けた JSON を読み込む</button></div>'+
+     '<textarea class="import-area" id="st-json" placeholder="ここに JSON が出力されます／読み込む JSON を貼り付けます"></textarea></div>';
+  h+='<div class="card"><h3>進捗のリセット</h3><div class="btn-row">'+
+     '<button class="btn" id="st-reset-prog">学習進捗と成績を消去</button></div></div>';
+  h+='<div class="card"><h3>selfTest 結果</h3><div class="st-log" id="st-log">（起動時に自動実行されます）</div>'+
+     '<div class="btn-row"><button class="btn btn-sm" id="st-rerun">再実行</button></div></div>';
+  p.innerHTML=h;
+
+  $all("[data-len]",p).forEach(function(b){
+    b.addEventListener("click", function(){ state.settings.sessionLen=+b.dataset.len; saveSettings(); renderSettings(); });
+  });
+  $all(".edit-row",p).forEach(function(row){
+    var id=row.dataset.id;
+    $all("input[type=number]",row).forEach(function(inp){
+      inp.addEventListener("change", function(){
+        var m=meterDef(inp.dataset.key);
+        var v=Math.round(+inp.value);
+        if(isNaN(v)) v=meterOf(getProduct(id), m.key);
+        v=Math.max(m.min, Math.min(m.max, v));
+        inp.value=v;
+        var ov=state.overrides[id]||{};
+        ov[m.key]=v; state.overrides[id]=ov; saveOverrides();
+        row.classList.add("edited");
+      });
+    });
+  });
+  $("#st-reset-ov",p).addEventListener("click", function(){
+    if(!confirm("メーター値の修正をすべて取り消し、初期値に戻します。よろしいですか？")) return;
+    state.overrides={}; saveOverrides(); renderSettings();
+  });
+  $("#st-export",p).addEventListener("click", function(){
+    $("#st-json",p).value=JSON.stringify(state.overrides, null, 2);
+  });
+  $("#st-import",p).addEventListener("click", function(){
+    var t=$("#st-json",p).value.trim();
+    if(!t){ alert("読み込む JSON を貼り付けてください。"); return; }
+    try{
+      var o=JSON.parse(t);
+      if(!o || typeof o!=="object" || Array.isArray(o)) throw new Error("オブジェクト形式ではありません");
+      state.overrides=o; saveOverrides(); renderSettings();
+      alert("読み込みました。");
+    }catch(e){ alert("JSON を読み込めませんでした：" + e.message); }
+  });
+  $("#st-reset-prog",p).addEventListener("click", function(){
+    if(!confirm("学習進捗と成績をすべて消去します。よろしいですか？（メーター修正値は残ります）")) return;
+    state.progress={}; state.stats={}; saveProgress(); saveStats();
+    renderSettings(); updateOverall();
+  });
+  $("#st-rerun",p).addEventListener("click", function(){ showSelfTest(runSelfTest()); });
+  showSelfTest(lastSelfTest);
+}
+function showSelfTest(res){
+  var host=$("#st-log"); if(!host || !res) return;
+  var head=(res.pass?'<span class="st-ok">PASS</span>':'<span class="st-ng">FAIL</span>')+
+    "  checks="+res.checks+" fails="+res.fails.length+" warns="+res.warns.length+"\n\n";
+  var body=res.fails.map(function(l){ return '<span class="st-ng">[NG] '+escapeHtml(l)+'</span>'; })
+    .concat(res.warns.map(function(l){ return '<span class="st-wn">[WARN] '+escapeHtml(l)+'</span>'; }))
+    .join("\n");
+  host.innerHTML=head+(body||'<span class="st-ok">すべての検査に合格しました。</span>');
+}
+// ==================== selfTest ====================
+var lastSelfTest=null;
+var EXPECTED_COUNT=30;
+
+function runSelfTest(){
+  var checks=0, fails=[], warns=[];
+  function ok(label, cond){ checks++; if(!cond) fails.push(label); }
+  function eq(label, a, b){ checks++; if(a!==b) fails.push(label+"（実際: "+a+" / 期待: "+b+"）"); }
+
+  try{
+    // ---- D1: id の一意性 ----
+    var seen={}, dup=[];
+    PRODUCTS.forEach(function(p){ if(seen[p.id]) dup.push(p.id); seen[p.id]=1; });
+    ok("D1 商品idが重複: "+dup.join(","), dup.length===0);
+
+    // ---- D2: 必須項目が非空 ----
+    PRODUCTS.forEach(function(p){
+      ok("D2 "+p.id+" name が空", !!p.name);
+      ok("D2 "+p.id+" nameEn が空", !!p.nameEn);
+      ok("D2 "+p.id+" cat（惹句）が空", !!p.cat);
+      ok("D2 "+p.id+" desc が空", !!p.desc);
+    });
+
+    // ---- D3: メーター値域 ----
+    PRODUCTS.forEach(function(p){
+      METERS.forEach(function(m){
+        var v=p[m.key];
+        ok("D3 "+p.id+" "+m.key+"="+v+" が範囲外/非整数",
+           typeof v==="number" && v===Math.round(v) && v>=m.min && v<=m.max);
+      });
+    });
+
+    // ---- D4: keys が desc に実在する（穴埋めが成立する保証） ----
+    PRODUCTS.forEach(function(p){
+      ok("D4 "+p.id+" keys が空", p.keys && p.keys.length>0);
+      (p.keys||[]).forEach(function(k){
+        ok("D4 "+p.id+" キーワード「"+k+"」が desc に見つからない", p.desc.indexOf(k)>=0);
+      });
+      // 同じ商品内でキーワードが重複していると穴埋めの置換位置がずれる
+      var ks={}, kdup=false;
+      (p.keys||[]).forEach(function(k){ if(ks[k]) kdup=true; ks[k]=1; });
+      ok("D4 "+p.id+" キーワードが重複", !kdup);
+    });
+
+    // ---- D5: カテゴリとorigin ----
+    PRODUCTS.forEach(function(p){
+      ok("D5 "+p.id+" category が不正: "+p.category, ["blend","straight","order"].indexOf(p.category)>=0);
+      if(p.category==="straight" || p.category==="order"){
+        ok("D5 "+p.id+" ストレート/お取り寄せなのに origin が無い", !!p.origin);
+      }
+      if(p.category==="blend"){
+        ok("D5 "+p.id+" ブレンドなのに origin がある", p.origin===null);
+      }
+      ok("D5 "+p.id+" icons が配列でない", Object.prototype.toString.call(p.icons)==="[object Array]");
+    });
+
+    // ---- D6: 商品数 ----
+    eq("D6 商品数", PRODUCTS.length, EXPECTED_COUNT);
+
+    // ---- Q1: 穴埋め選択肢生成（全商品×全キー） ----
+    PRODUCTS.forEach(function(p){
+      (p.keys||[]).forEach(function(k){
+        var ch=buildKeyChoices(p,k);
+        eq("Q1 "+p.id+" 選択肢数", ch.length, 4);
+        var cnt=0, s={}, d=false;
+        ch.forEach(function(c){ if(c===k) cnt++; if(s[c]) d=true; s[c]=1; });
+        eq("Q1 "+p.id+" 正解の個数", cnt, 1);
+        ok("Q1 "+p.id+" 選択肢が重複", !d);
+      });
+    });
+
+    // ---- Q2: 逆引き選択肢生成（該当商品はちょうど1つ） ----
+    PRODUCTS.forEach(function(p){
+      var ch=buildReverseChoices(p);
+      eq("Q2 "+p.id+" 選択肢数", ch.length, 4);
+      var matches=matchingProducts(p), mids={};
+      matches.forEach(function(m){ mids[m.id]=1; });
+      var hit=0, s={}, d=false;
+      ch.forEach(function(c){ if(mids[c.id]) hit++; if(s[c.id]) d=true; s[c.id]=1; });
+      eq("Q2 "+p.id+" 該当商品の個数", hit, 1);
+      ok("Q2 "+p.id+" 選択肢が重複", !d);
+      ok("Q2 "+p.id+" 正解が選択肢に含まれない", ch.some(function(c){ return c.id===p.id; }));
+    });
+
+    // ---- Q3: judgeMeter の境界 ----
+    eq("Q3 d=0", judgeMeter(5,5), "perfect");
+    eq("Q3 d=1(上)", judgeMeter(6,5), "close");
+    eq("Q3 d=1(下)", judgeMeter(4,5), "close");
+    eq("Q3 d=2", judgeMeter(7,5), "miss");
+    eq("Q3 得点 perfect", judgeScore("perfect"), 1);
+    eq("Q3 得点 close", judgeScore("close"), 0.5);
+    eq("Q3 得点 miss", judgeScore("miss"), 0);
+
+    // ---- Q4: meterPct が 0-100% に収まる ----
+    METERS.forEach(function(m){
+      for(var v=m.min; v<=m.max; v++){
+        var pc=meterPct(m,v);
+        ok("Q4 "+m.key+"="+v+" の位置が範囲外: "+pc, pc>=0 && pc<=100);
+      }
+    });
+
+    // ---- Q5: override が meterOf / profileOf に反映される ----
+    (function(){
+      var p0=PRODUCTS[0];
+      var backup=state.overrides[p0.id];
+      var orig=meterOf(p0,"taste");
+      var alt=(orig===1? 2 : 1);
+      state.overrides[p0.id]=Object.assign({}, backup||{}, {taste:alt});
+      eq("Q5 override がmeterOfに反映", meterOf(p0,"taste"), alt);
+      ok("Q5 override がprofileOfに反映", profileOf(p0).indexOf(alt+"-")===0);
+      if(backup) state.overrides[p0.id]=backup; else delete state.overrides[p0.id];
+      eq("Q5 override の後始末", meterOf(p0,"taste"), orig);
+    })();
+
+    // ---- M1: localStorage 往復（専用キーで書き→読み→削除） ----
+    (function(){
+      var k="rikei.coffee.selftest";
+      try{
+        localStorage.setItem(k, JSON.stringify({a:1}));
+        var got=JSON.parse(localStorage.getItem(k));
+        eq("M1 localStorage 往復", got&&got.a, 1);
+        localStorage.removeItem(k);
+        ok("M1 テスト用キーの後始末", localStorage.getItem(k)===null);
+      }catch(e){
+        warns.push("M1 localStorage が使えません（進捗は保存されません）: "+e.message);
+      }
+    })();
+
+    // ---- W1: メーター読み取り精度の警告 ----
+    var low=PRODUCTS.filter(function(p){ return p.meterConf==="low" && !state.overrides[p.id]; });
+    if(low.length){
+      warns.push("W1 メーター値が写真からの推定のままの商品が "+low.length+" 件あります（設定タブで実物に合わせて修正できます）");
+    }
+  }catch(e){
+    fails.push("例外: "+(e && e.message ? e.message : String(e)));
+  }
+
+  var pass=(fails.length===0);
+  lastSelfTest={pass:pass, checks:checks, fails:fails, warns:warns};
+  var summary="SELFTEST:"+(pass?"PASS":"FAIL")+" | checks="+checks+" fails="+fails.length+" warns="+warns.length;
+  window.__selftest=lastSelfTest;
+  window.__selftestSummary=summary;
+  try{
+    console.log("%c[コーヒーアプリ "+summary+"]","font-weight:bold;color:"+(pass?"green":"red"));
+    fails.forEach(function(l){ console.log("[NG] "+l); });
+    warns.forEach(function(l){ console.log("[WARN] "+l); });
+  }catch(e){}
+  return lastSelfTest;
+}
+
+// ==================== 起動 ====================
+function init(){
+  loadState();
+  buildTabbar();
+  runSelfTest();
+  var g=$("#gear-btn");
+  if(g) g.addEventListener("click", function(){ switchTab("settings"); });
+  switchTab("home");
+  updateOverall();
+}
+window.addEventListener("DOMContentLoaded", init);
+</script>
+<script>
+// オフライン起動用。file:// で直接開いたときは何もしない
+if ("serviceWorker" in navigator && location.protocol.indexOf("http") === 0) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("./sw.js").catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
